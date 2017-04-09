@@ -20,7 +20,6 @@ def main():
     run_env(env,best_param,no_of_steps=200)
 
   env.close()
-  gym.upload('/tmp/cartpole-experiment-1', api_key='sk_hx1EEvQsTCOpk1lDufLDjw')
 
 
 def run_env(env,param,no_of_steps=200,show=False):
