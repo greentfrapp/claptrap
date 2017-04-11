@@ -18,6 +18,8 @@ def main():
       best_reward = reward
     if best_reward==200: break
 
+  print best_param
+
   # CartPole-v0 defines "solving" as getting average reward of 195.0 over 100 consecutive trials.
   for _ in range(100):
     run_env(env,best_param)
