@@ -126,7 +126,7 @@ def run_episode(env, policy_grad, value_grad, sess):
 
     ## Runs an episode for at most 200 steps
     for _ in xrange(200):
-        env.render()
+        #env.render()
         # calculate policy
         ## Expands observation to fit <state> in policy_gradient()
         obs_vector = np.expand_dims(observation, axis=0)
@@ -195,10 +195,12 @@ def run_episode(env, policy_grad, value_grad, sess):
     # update value function
     ## Update the neural net for the next episode
     update_vals_vector = np.expand_dims(update_vals, axis=1)
-
+    sess.run(vl_optimizer, feed_dict={vl_state: states, vl_newvals: update_vals_vector})
+    
     # real_vl_loss = sess.run(vl_loss, feed_dict={vl_state: states, vl_newvals: update_vals_vector})
     ## Update the policy for the next episode
     advantages_vector = np.expand_dims(advantages, axis=1)
+    sess.run(pl_optimizer, feed_dict={pl_state: states, pl_advantages: advantages_vector, pl_actions: actions})
 
     return totalreward
 
@@ -209,8 +211,10 @@ policy_grad = policy_gradient()
 value_grad = value_gradient()
 sess = tf.InteractiveSession()
 sess.run(tf.initialize_all_variables())
+##rewards = []
 for i in xrange(2000):
     reward = run_episode(env, policy_grad, value_grad, sess)
+    ##rewards.append(reward)
     if reward == 200:
         print "reward 200"
         print i
@@ -222,3 +226,7 @@ for _ in xrange(1000):
 print t / 1000
 ##env.monitor.close()
 env.close()
+
+##ax = plt.axes()
+##ax.plot(range(len(rewards)),rewards)
+##plt.show()
