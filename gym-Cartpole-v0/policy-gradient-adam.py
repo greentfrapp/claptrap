@@ -10,9 +10,13 @@ class Policy(object):
     self.weights = {
       'w1':w1,
       }
-    self.RMS_grad = {
+    self.MS_grad = {
       'w1':np.zeros((2,4))
       }
+    self.M_grad = {
+      'w1':np.zeros((2,4))
+      }
+    self.timestep = 1
 
   def get_action(self,state):
     output = np.matmul(self.weights['w1'],state)
@@ -55,14 +59,22 @@ class Policy(object):
 
     grad_w1 = np.array(grad_w1)
 
-    # Update RMS_grad
-    self.RMS_grad['w1'] = 0.9 * self.RMS_grad['w1'] + 0.1 * grad_w1 * grad_w1
+    # Update MS_grad
+    beta_1 = 0.999
+    self.MS_grad['w1'] = beta_1 * self.MS_grad['w1'] + (1 - beta_1) * grad_w1 * grad_w1
 
-    # Finally, update weights with RMS_grad
-    learning_rate = 0.001
+    # Update M_grad
+    beta_2 = 0.9
+    self.M_grad['w1'] = beta_2 * self.M_grad['w1'] + (1 - beta_2) * grad_w1
+
+    # Finally, correct for zero-bias and update weights with ADAM
+    learning_rate = 0.01
     smoothing = 1e-8
-    self.weights['w1'] = self.weights['w1'] - (learning_rate / np.sqrt(self.RMS_grad['w1'] + smoothing)) * grad_w1
-    #self.weights['w1'] = self.weights['w1'] - learning_rate * grad_w1
+    MS_grad = self.MS_grad['w1'] / (1 - beta_1**self.timestep)
+    M_grad = self.M_grad['w1'] / (1 - beta_2**self.timestep)
+    self.weights['w1'] = self.weights['w1'] - (learning_rate / (np.sqrt(MS_grad) + smoothing)) * M_grad
+
+    self.timestep += 1
 
     return loss
 
@@ -82,13 +94,19 @@ class RewardModel(object):
       'b2':b2
       }
     self.hidden_layer_outputs = []
-    self.RMS_grad = {
+    self.MS_grad = {
       'w1':np.zeros((10,4)),
       'b1':np.zeros((10,1)),
       'w2':np.zeros((1,10)),
       'b2':np.zeros((1,1))
       }
-
+    self.M_grad = {
+      'w1':np.zeros((10,4)),
+      'b1':np.zeros((10,1)),
+      'w2':np.zeros((1,10)),
+      'b2':np.zeros((1,1))
+      }
+    self.timestep = 1
 
   def predict_cumulative_reward(self,history):
     cumulative_reward_history = []
@@ -143,19 +161,29 @@ class RewardModel(object):
     grad_w2 = np.array(grad_w2)
     grad_b2 = np.array(grad_b2)
 
-    # Update RMS_grad
-    self.RMS_grad['w1'] = 0.9 * self.RMS_grad['w1'] + 0.1 * grad_w1 * grad_w1
-    self.RMS_grad['b1'] = 0.9 * self.RMS_grad['b1'] + 0.1 * grad_b1 * grad_b1
-    self.RMS_grad['w2'] = 0.9 * self.RMS_grad['w2'] + 0.1 * grad_w2 * grad_w2
-    self.RMS_grad['b2'] = 0.9 * self.RMS_grad['b2'] + 0.1 * grad_b2 * grad_b2
+    # Update MS_grad
+    beta_1 = 0.999
+    self.MS_grad['w1'] = beta_1 * self.MS_grad['w1'] + (1 - beta_1) * grad_w1 * grad_w1
+    self.MS_grad['b1'] = beta_1 * self.MS_grad['b1'] + (1 - beta_1) * grad_b1 * grad_b1
+    self.MS_grad['w2'] = beta_1 * self.MS_grad['w2'] + (1 - beta_1) * grad_w2 * grad_w2
+    self.MS_grad['b2'] = beta_1 * self.MS_grad['b2'] + (1 - beta_1) * grad_b2 * grad_b2
 
-    # Finally, update weights with RMS_grad
-    learning_rate = 0.001
+    # Update M_grad
+    beta_2 = 0.9
+    self.M_grad['w1'] = beta_2 * self.M_grad['w1'] + (1 - beta_2) * grad_w1
+    self.M_grad['b1'] = beta_2 * self.M_grad['b1'] + (1 - beta_2) * grad_b1
+    self.M_grad['w2'] = beta_2 * self.M_grad['w2'] + (1 - beta_2) * grad_w2
+    self.M_grad['b2'] = beta_2 * self.M_grad['b2'] + (1 - beta_2) * grad_b2
+
+    # Finally, correct for zero-bias and update weights with ADAM
+    learning_rate = 0.1
     smoothing = 1e-8
-    self.weights['w1'] = self.weights['w1'] - (learning_rate / np.sqrt(self.RMS_grad['w1'] + smoothing)) * grad_w1
-    self.weights['b1'] = self.weights['b1'] - (learning_rate / np.sqrt(self.RMS_grad['b1'] + smoothing)) * grad_b1
-    self.weights['w2'] = self.weights['w2'] - (learning_rate / np.sqrt(self.RMS_grad['w2'] + smoothing)) * grad_w2
-    self.weights['b2'] = self.weights['b2'] - (learning_rate / np.sqrt(self.RMS_grad['b2'] + smoothing)) * grad_b2
+    self.weights['w1'] = self.weights['w1'] - (learning_rate / (np.sqrt(self.MS_grad['w1'] / (1 - beta_1**self.timestep)) + smoothing)) * (self.M_grad['w1'] / (1 - beta_2**self.timestep))
+    self.weights['b1'] = self.weights['b1'] - (learning_rate / (np.sqrt(self.MS_grad['b1'] / (1 - beta_1**self.timestep)) + smoothing)) * (self.M_grad['b1'] / (1 - beta_2**self.timestep))
+    self.weights['w2'] = self.weights['w2'] - (learning_rate / (np.sqrt(self.MS_grad['w2'] / (1 - beta_1**self.timestep)) + smoothing)) * (self.M_grad['w2'] / (1 - beta_2**self.timestep))
+    self.weights['b2'] = self.weights['b2'] - (learning_rate / (np.sqrt(self.MS_grad['b2'] / (1 - beta_1**self.timestep)) + smoothing)) * (self.M_grad['b2'] / (1 - beta_2**self.timestep))
+
+    self.timestep += 1
 
     return loss
 
@@ -186,8 +214,8 @@ def main():
 
   ax = plt.axes()
   ax.plot(range(len(reward)),reward,color='red')
-  #ax.plot(range(len(model_loss)),model_loss,color='blue')
-  #ax.plot(range(len(policy_loss)),policy_loss,color='green')
+  ax.plot(range(len(model_loss)),model_loss,color='blue')
+  ax.plot(range(len(policy_loss)),policy_loss,color='green')
 
   plt.show()
 
