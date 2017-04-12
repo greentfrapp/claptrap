@@ -50,8 +50,8 @@ class Policy(object):
       for idx2 in range(4):
         grad = 0
         for idx3,action in enumerate(actions):
-          grad += actions[idx3][idx] * action_prob[idx3][idx] * performance[idx3] * states[idx3][idx2]
-        grad_w1[-1].append(grad)
+          grad += (actions[idx3][idx] - action_prob[idx3][idx]) * performance[idx3] * states[idx3][idx2]
+        grad_w1[-1].append(grad / len(performance))
 
     grad_w1 = np.array(grad_w1)
 
@@ -59,7 +59,7 @@ class Policy(object):
     self.RMS_grad['w1'] = 0.9 * self.RMS_grad['w1'] + 0.1 * grad_w1 * grad_w1
 
     # Finally, update weights with RMS_grad
-    learning_rate = 0.001
+    learning_rate = 0.01
     smoothing = 1e-8
     self.weights['w1'] = self.weights['w1'] - (learning_rate / np.sqrt(self.RMS_grad['w1'] + smoothing)) * grad_w1
     #self.weights['w1'] = self.weights['w1'] - learning_rate * grad_w1
@@ -94,7 +94,7 @@ class RewardModel(object):
     cumulative_reward_history = []
     hidden_layer_output_history = []
     for step in history:
-      hidden_layer_output = relu(np.matmul(self.weights['w1'],step['prev_state'])+self.weights['b1'])
+      hidden_layer_output = relu(np.matmul(self.weights['w1'],np.array([step['prev_state']]).T)+self.weights['b1'])
       cumulative_reward = np.sum(np.matmul(self.weights['w2'],hidden_layer_output)+self.weights['b2'])
       hidden_layer_output_history.append(hidden_layer_output)
       cumulative_reward_history.append(cumulative_reward)
@@ -111,32 +111,35 @@ class RewardModel(object):
 
     # Calculate gradients
     grad_w2 = []
+    delta_w2 = []
     for idx in range(1):
       grad_w2.append([])
+      delta_w2.append([])
       for idx2 in range(10):
         grad = 0
         for idx3,step in enumerate(performance):
           grad += performance[idx3] * self.hidden_layer_outputs[idx3][idx2]
-        grad_w2[-1].append(grad)
-    grad_b2 = [[np.sum(performance)]]
+        grad_w2[-1].append(grad / len(performance))
+        delta_w2[-1].append(np.mean(performance))
+    grad_b2 = [[np.mean(performance)]]
     grad_w1 = []
     for idx in range(10):
       grad_w1.append([])
       for idx2 in range(4):
-        if np.sum(np.sum(self.hidden_layer_outputs,axis=0),axis=0)[idx] > 0:
-          grad = 0
-          for idx3,step in enumerate(performance):
-            grad += np.sum(performance[idx3] * self.weights['w2'] * states[idx3][idx2])
-          grad_w1[-1].append(grad)
-        else:
-          grad_w1[-1].append(0)
+        grad = 0
+        for idx3,step in enumerate(performance):
+          if self.hidden_layer_outputs[idx3][idx] > 0:
+            grad += float(performance[idx3] * np.matmul(delta_w2,self.weights['w2'].T)[0][0] * states[idx3][idx2])
+        grad_w1[-1].append(grad / len(performance))
+
     grad_b1 = []
     for idx in range(10):
       grad_b1.append([])
-      if np.sum(np.sum(self.hidden_layer_outputs,axis=0),axis=0)[idx] > 0:
-        grad_b1[-1].append(np.sum([np.sum(performance,axis=0)] * self.weights['w2']))
-      else:
-        grad_b1[-1].append(0)
+      grad = 0
+      for idx2,step in enumerate(performance):
+        if self.hidden_layer_outputs[idx2][idx] > 0:
+          grad += float(performance[idx2] * np.matmul(delta_w2,self.weights['w2'].T)[0][0])
+      grad_b1[-1].append(grad / len(performance))
 
     grad_w1 = np.array(grad_w1)
     grad_b1 = np.array(grad_b1)
@@ -170,7 +173,7 @@ def main():
   reward_model = RewardModel()
 
   # Run at most 5000 episodes for training
-  for _ in range(5000):
+  for _ in range(2000):
     episode_reward,episode_model_loss,episode_policy_loss = run_episode(env,reward_model,policy)
     reward.append(episode_reward)
     model_loss.append(episode_model_loss)
@@ -191,7 +194,7 @@ def main():
 
   plt.show()
 
-def run_episode(env,reward_model,policy,no_of_steps=500):
+def run_episode(env,reward_model,policy,no_of_steps=200):
 
   history = []
   total_reward = 0
@@ -199,7 +202,7 @@ def run_episode(env,reward_model,policy,no_of_steps=500):
   state = env.reset()
 
   for _ in range(no_of_steps):
-    env.render()
+    #env.render()
     prev_state = state
     # Get action probabilities, select and run action
     action, action_prob = policy.get_action(state)
