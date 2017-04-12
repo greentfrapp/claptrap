@@ -74,7 +74,7 @@ def policy_gradient():
         ## adjusting the policy to increase the loss if it is negative
         ## and decrease the loss if it is positive
         ##
-        good_probabilities = tf.reduce_sum(tf.mul(probabilities, actions),reduction_indices=[1])
+        good_probabilities = tf.reduce_sum(tf.multiply(probabilities, actions),reduction_indices=[1])
         eligibility = tf.log(good_probabilities) * advantages
         loss = -tf.reduce_sum(eligibility)
         optimizer = tf.train.AdamOptimizer(0.01).minimize(loss)
@@ -126,6 +126,7 @@ def run_episode(env, policy_grad, value_grad, sess):
 
     ## Runs an episode for at most 200 steps
     for _ in xrange(200):
+        env.render()
         # calculate policy
         ## Expands observation to fit <state> in policy_gradient()
         obs_vector = np.expand_dims(observation, axis=0)
@@ -147,6 +148,7 @@ def run_episode(env, policy_grad, value_grad, sess):
         transitions.append((old_observation, action, reward))
         totalreward += reward
         if done:
+            print totalreward
             break
     ##
     ## Recall that transitions consist of (state, action, reward) elements
@@ -193,17 +195,16 @@ def run_episode(env, policy_grad, value_grad, sess):
     # update value function
     ## Update the neural net for the next episode
     update_vals_vector = np.expand_dims(update_vals, axis=1)
-    sess.run(vl_optimizer, feed_dict={vl_state: states, vl_newvals: update_vals_vector})
+
     # real_vl_loss = sess.run(vl_loss, feed_dict={vl_state: states, vl_newvals: update_vals_vector})
     ## Update the policy for the next episode
     advantages_vector = np.expand_dims(advantages, axis=1)
-    sess.run(pl_optimizer, feed_dict={pl_state: states, pl_advantages: advantages_vector, pl_actions: actions})
 
     return totalreward
 
 
 env = gym.make('CartPole-v0')
-env.monitor.start('cartpole-hill/', force=True)
+##env.monitor.start('cartpole-hill/', force=True)
 policy_grad = policy_gradient()
 value_grad = value_gradient()
 sess = tf.InteractiveSession()
@@ -219,4 +220,5 @@ for _ in xrange(1000):
     reward = run_episode(env, policy_grad, value_grad, sess)
     t += reward
 print t / 1000
-env.monitor.close()
+##env.monitor.close()
+env.close()

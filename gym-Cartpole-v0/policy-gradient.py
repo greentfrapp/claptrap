@@ -1,6 +1,7 @@
 import gym
 from gym import wrappers
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Policy(object):
 
@@ -61,6 +62,7 @@ class Policy(object):
     learning_rate = 0.001
     smoothing = 1e-8
     self.weights['w1'] = self.weights['w1'] - (learning_rate / np.sqrt(self.RMS_grad['w1'] + smoothing)) * grad_w1
+    #self.weights['w1'] = self.weights['w1'] - learning_rate * grad_w1
 
     return loss
 
@@ -162,19 +164,32 @@ def main():
   log_directory = '/tmp/cartpole-policy-gradient'
   #env = wrappers.Monitor(env,log_directory,force=True)
 
+  reward,model_loss,policy_loss = [],[],[]
+
   policy = Policy()
   reward_model = RewardModel()
 
-  # Run at most 10000 episodes for training
-  for _ in range(10000):
-    total_reward = run_episode(env,reward_model,policy)
-    if total_reward == 200: break
+  # Run at most 50000 episodes for training
+  for _ in range(50000):
+    episode_reward,episode_model_loss,episode_policy_loss = run_episode(env,reward_model,policy)
+    reward.append(episode_reward)
+    model_loss.append(episode_model_loss)
+    policy_loss.append(episode_policy_loss)
+
+    #if episode_reward == 200: break
 
   # Run 100 more episodes for proving that exercise is solved
   for _ in range(100):
     run_episode(env,reward_model,policy)
 
   env.close()
+
+  ax = plt.axes()
+  ax.plot(range(len(reward)),reward,color='red')
+  #ax.plot(range(len(model_loss)),model_loss,color='blue')
+  #ax.plot(range(len(policy_loss)),policy_loss,color='green')
+
+  plt.show()
 
 def run_episode(env,reward_model,policy,no_of_steps=200):
 
@@ -210,7 +225,7 @@ def run_episode(env,reward_model,policy,no_of_steps=200):
 
   print str(total_reward)+" ModelLoss: "+str(model_loss)+" PolicyLoss: "+str(policy_loss)
 
-  return total_reward
+  return total_reward,model_loss,policy_loss
 
 def relu(vector):
   vector[vector < 0] = 0
@@ -232,6 +247,6 @@ def get_cumulative_reward(history):
       cumulative_reward += step['reward'] * discount
       discount *= discount_decrement
     cumulative_reward_history.append(cumulative_reward)
-  return np.array(cumulative_reward)
+  return np.array(cumulative_reward_history)
 
 if __name__=="__main__": main()
