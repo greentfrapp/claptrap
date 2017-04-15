@@ -26,32 +26,21 @@ class Policy(object):
   def update(self,performance,history):
 
     # Calculate loss
-    # where action_prob is tensor of probability vectors (nx2)
-    # and action is tensor of 1-hot action taken vectors (nx2)
-    # Get actions as 1-hot vectors, action_prob and states from history
-    action_prob = []
-    action = []
-    states = []
-    for step in history:
-      action_prob.append(step['action_prob'])
-      states.append(step['prev_state'])
-      if step['action'] == 0: action.append([1,0])
-      else: action.append([0,1]) 
-    action_prob = np.array(action_prob)
-    actions = np.array(action)
-    states = np.array(states)
-    loss = float(-np.matmul(performance,np.log(np.sum(action_prob*actions,axis=1,keepdims=True))))
+    # where history.action_probs is tensor of probability vectors (nx2)
+    # and history.actions is tensor of 1-hot action taken vectors (nx2)
+    loss = float(-np.matmul(performance,np.log(np.sum(history.action_probs * history.actions, axis=1, keepdims=True))))
 
     # Calculate gradients
-    grad_w1 = np.matmul(((actions - action_prob) * performance.T / len(performance)).T,states)
+    gradients = {}
+    gradients['w1'] = np.matmul(((history.actions - history.action_probs) * performance.T / len(performance)).T,history.states)
 
     # Update MS_grad
     beta_1 = 0.999
-    self.MS_grad['w1'] = beta_1 * self.MS_grad['w1'] + (1 - beta_1) * grad_w1**2
+    self.MS_grad['w1'] = beta_1 * self.MS_grad['w1'] + (1 - beta_1) * gradients['w1']**2
 
     # Update M_grad
     beta_2 = 0.9
-    self.M_grad['w1'] = beta_2 * self.M_grad['w1'] + (1 - beta_2) * grad_w1
+    self.M_grad['w1'] = beta_2 * self.M_grad['w1'] + (1 - beta_2) * gradients['w1']
 
     # Finally, correct for zero-bias and update weights with ADAM
     learning_rate = 0.1
@@ -63,7 +52,6 @@ class Policy(object):
     self.timestep += 1
 
     return loss
-
 
 class RewardModel(object):
 
@@ -92,13 +80,10 @@ class RewardModel(object):
 
   def predict_cumulative_reward(self,history):
 
-    # where state is nx4
-    # it's okay to just use np.matmul(weights,states.T)+bias due to broadcast
+    # where history.states is nx4
+    # it's okay to just use np.matmul(weights,history.states.T)+bias due to broadcast
     # hidden_layer_output 10xn
-    states = []
-    for step in history: states.append(step['prev_state'])
-    states = np.array(states).reshape(len(states),4)
-    hidden_layer_output = relu(np.matmul(self.weights['w1'],states.T)+self.weights['b1'])
+    hidden_layer_output = relu(np.matmul(self.weights['w1'],history.states.T)+self.weights['b1'])
     cumulative_reward = np.matmul(self.weights['w2'],hidden_layer_output)+self.weights['b2']
     
     self.hidden_layer_outputs = hidden_layer_output
@@ -110,59 +95,63 @@ class RewardModel(object):
     # performance.shape (1xn)
     loss = 0.5 * np.mean(performance**2)
 
-    # Get states from history
-    states = []
-    for step in history: states.append(step['prev_state'])
-    states = np.array(states)
-
     # Calculate gradients
-
-    grad_w2 = (np.sum(self.hidden_layer_outputs * performance, axis=1) / len(performance)).reshape(1,10)
+    gradients = {}
+    gradients['w2'] = (np.sum(self.hidden_layer_outputs * performance, axis=1) / len(performance)).reshape(1,10)
     delta_w2 = np.ones((1,10)) * np.mean(performance) / len(performance)
-    grad_b2 = np.mean(performance).reshape(1,1)
+    gradients['b2'] = np.mean(performance).reshape(1,1)
     # 10x1 * 10x1 * 10xn . nx4 * nx1 * sum(1x10 * 1x10)
-    grad_w1 = np.matmul(delta_w2.T * self.weights['w2'].T * heaviside(self.hidden_layer_outputs),states)
-    grad_b1 = np.sum(delta_w2.T * self.weights['w2'].T * heaviside(self.hidden_layer_outputs),axis=1).reshape(10,1)
-    
+    gradients['w1'] = np.matmul(delta_w2.T * self.weights['w2'].T * heaviside(self.hidden_layer_outputs),history.states)
+    gradients['b1'] = np.sum(delta_w2.T * self.weights['w2'].T * heaviside(self.hidden_layer_outputs),axis=1).reshape(10,1)
 
     # Update MS_grad
     beta_1 = 0.999
-
-    self.MS_grad['w1'] = beta_1 * self.MS_grad['w1'] + (1 - beta_1) * grad_w1**2
-    self.MS_grad['b1'] = beta_1 * self.MS_grad['b1'] + (1 - beta_1) * grad_b1**2
-    self.MS_grad['w2'] = beta_1 * self.MS_grad['w2'] + (1 - beta_1) * grad_w2**2
-    self.MS_grad['b2'] = beta_1 * self.MS_grad['b2'] + (1 - beta_1) * grad_b2**2
+    for key in self.MS_grad:
+      self.MS_grad[key] = beta_1 * self.MS_grad[key] + (1 - beta_1) * gradients[key]**2
 
     # Update M_grad
     beta_2 = 0.9
-    self.M_grad['w1'] = beta_2 * self.M_grad['w1'] + (1 - beta_2) * grad_w1
-    self.M_grad['b1'] = beta_2 * self.M_grad['b1'] + (1 - beta_2) * grad_b1
-    self.M_grad['w2'] = beta_2 * self.M_grad['w2'] + (1 - beta_2) * grad_w2
-    self.M_grad['b2'] = beta_2 * self.M_grad['b2'] + (1 - beta_2) * grad_b2
+    for key in self.M_grad:
+      self.M_grad[key] = beta_2 * self.M_grad[key] + (1 - beta_2) * gradients[key]
 
-    # Finally, correct for zero-bias and update weights with ADAM
+    # Correct for zero-bias
     corrected_MS_grad = {}
     corrected_M_grad = {}
-    corrected_MS_grad['w1'] = self.MS_grad['w1'] / (1 - beta_1**self.timestep)
-    corrected_MS_grad['b1'] = self.MS_grad['b1'] / (1 - beta_1**self.timestep)
-    corrected_MS_grad['w2'] = self.MS_grad['w2'] / (1 - beta_1**self.timestep)
-    corrected_MS_grad['b2'] = self.MS_grad['b2'] / (1 - beta_1**self.timestep)
-    corrected_M_grad['w1'] = self.M_grad['w1'] / (1 - beta_2**self.timestep)
-    corrected_M_grad['b1'] = self.M_grad['b1'] / (1 - beta_2**self.timestep)
-    corrected_M_grad['w2'] = self.M_grad['w2'] / (1 - beta_2**self.timestep)
-    corrected_M_grad['b2'] = self.M_grad['b2'] / (1 - beta_2**self.timestep)
+    for key in self.weights:
+      corrected_MS_grad[key] = self.MS_grad[key] / (1 - beta_1**self.timestep)
+      corrected_M_grad[key] = self.M_grad[key] / (1 - beta_2**self.timestep)
 
+    # Finally, update weights with ADAM
     learning_rate = 0.001
     smoothing = 1e-8
-
-    self.weights['w1'] = self.weights['w1'] - (learning_rate / (np.sqrt(corrected_MS_grad['w1']) + smoothing)) * corrected_M_grad['w1']
-    self.weights['b1'] = self.weights['b1'] - (learning_rate / (np.sqrt(corrected_MS_grad['b1']) + smoothing)) * corrected_M_grad['b1']
-    self.weights['w2'] = self.weights['w2'] - (learning_rate / (np.sqrt(corrected_MS_grad['w2']) + smoothing)) * corrected_M_grad['w2']
-    self.weights['b2'] = self.weights['b2'] - (learning_rate / (np.sqrt(corrected_MS_grad['b2']) + smoothing)) * corrected_M_grad['b2']
+    for key in self.weights:
+      self.weights[key] += -(learning_rate / (np.sqrt(corrected_MS_grad[key]) + smoothing)) * corrected_M_grad[key]
 
     self.timestep += 1
 
     return loss
+
+class History(object):
+
+  def __init__(self):
+    self.states = None
+    self.actions = None
+    self.action_probs = None
+    self.rewards = None
+    self.no_of_steps = 0
+
+  def update(self,step):
+    if self.no_of_steps == 0: 
+      self.states = np.array([step['prev_state']])
+      self.actions = np.array([step['action']])
+      self.action_probs = np.array([step['action_prob']])
+      self.rewards = np.array([step['reward']])
+    else:
+      self.states = np.append(self.states,[step['prev_state']],axis=0)
+      self.actions = np.append(self.actions,[step['action']],axis=0)
+      self.action_probs = np.append(self.action_probs,[step['action_prob']],axis=0)
+      self.rewards = np.append(self.rewards,[step['reward']],axis=0)
+    self.no_of_steps += 1
 
 def main():
   env = gym.make('CartPole-v0')
@@ -198,7 +187,7 @@ def main():
 
 def run_episode(env,reward_model,policy,no_of_steps=200):
 
-  history = []
+  history = History()
   total_reward = 0
 
   state = env.reset()
@@ -210,7 +199,10 @@ def run_episode(env,reward_model,policy,no_of_steps=200):
     action, action_prob = policy.get_action(state)
     state, reward, done, info = env.step(action)
 
-    history.append({'prev_state':prev_state,'action':action,'action_prob':action_prob,'reward':reward})
+    if action == 0: action_vector = [1,0]
+    elif action == 1: action_vector = [0,1]
+
+    history.update({'prev_state':prev_state,'action':action_vector,'action_prob':action_prob,'reward':reward})
     total_reward += reward
 
     if done: break
@@ -246,16 +238,15 @@ def softmax(vector):
   return vector
 
 def get_cumulative_reward(history):
-  cumulative_reward_history = []
-  for idx,step in enumerate(history):
-    no_of_steps_left = len(history)-idx
+  cumulative_reward_history = np.array([])
+  for idx in range(history.no_of_steps):
     cumulative_reward = 0
-    discount = 1.00
+    discount = 1.0
     discount_decrement = 0.95
-    for idx2,step in enumerate(history[idx:]):
-      cumulative_reward += step['reward'] * discount
+    for reward in history.rewards[idx:]:
+      cumulative_reward += reward * discount
       discount *= discount_decrement
-    cumulative_reward_history.append(cumulative_reward)
-  return np.array(cumulative_reward_history)
+    cumulative_reward_history = np.append(cumulative_reward_history,cumulative_reward)
+  return cumulative_reward_history
 
 if __name__=="__main__": main()
