@@ -1,2 +1,9 @@
+.DS_Store
+*.pyc
+
 # ignore .log files used for recording results
 *.log
+
+# lstm-xor
+# ignore results folder
+lstm-xor/results/
