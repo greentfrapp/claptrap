@@ -7,3 +7,7 @@
 # lstm-xor
 # ignore results folder
 lstm-xor/results/
+
+# snake
+# ignore WorkInProgress
+snake/gui/
