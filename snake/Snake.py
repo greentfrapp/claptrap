@@ -26,13 +26,14 @@ class Snake(object):
 		# 0 - UP, 1 - LEFT, 2 - DOWN, 3 - RIGHT
 		self.current_direction = 0
 		self.UP = 1
-		self.LEFT = 2
+		self.RIGHT = 2
 		self.DOWN = 3
-		self.RIGHT = 4
+		self.LEFT = 4
 		
 		self.score = 0
 		self.reward = 0
 		self.timestep = 0
+		self.MAX_TIMESTEP = 1000
 
 		# Track state
 		# 0 - INACTIVE, 1 - START, 2 - RUNNING, 3 - END
@@ -48,7 +49,7 @@ class Snake(object):
 		self.grid = np.zeros((self.max_y+1, self.max_x+1))
 
 	def init_actions(self):
-		self.ALL_ACTIONS = [Action(0, "NO_OP"), Action(1, "UP"), Action(2, "LEFT"), Action(3, "DOWN"), Action(4, "RIGHT")]
+		self.ALL_ACTIONS = [Action(0, "NO_OP"), Action(1, "UP"), Action(2, "RIGHT"), Action(3, "DOWN"), Action(4, "LEFT")]
 		self.available_actions = []
 
 	def reset(self):
@@ -63,6 +64,10 @@ class Snake(object):
 		return Observation(self.grid, self.score, self.reward, self.available_actions, self.state)
 
 	def step(self, action_id):
+		if self.timestep == self.MAX_TIMESTEP:
+			self.die()
+			return Observation(self.grid, self.score, self.reward, self.available_actions, self.state)
+		self.timestep += 1
 		assert self.state == self.STATE_START or self.state == self.STATE_RUNNING, "Cannot run step method when state is in {}:{}, run reset instead".format(self.state, self.STATES[self.state])
 		if self.state == self.STATE_START:
 			self.state = self.STATE_RUNNING
@@ -111,18 +116,16 @@ class Snake(object):
 	def feed(self):
 		x = np.random.choice(np.arange(self.max_x + 1))
 		y = np.random.choice(np.arange(self.max_y + 1))
-		while x in self.snake[:, 1]:
+		while x in self.snake[:, 0] and y in self.snake[:, 1]:
 			x = np.random.choice(np.arange(self.max_x + 1))
-		while y in self.snake[:, 0]:
 			y = np.random.choice(np.arange(self.max_y + 1))
-		self.food = [y, x]
+		self.food = [x, y]
 
 	def update_grid(self):
 		self.reset_grid()
 		for [x, y] in self.snake:
 			self.grid[x, y] = 1
-		print(self.food)
-		self.grid[self.food[1], self.food[0]] = 8
+		self.grid[self.food[0], self.food[1]] = -1
 
 	def genesis(self):
 		self.reset_grid()

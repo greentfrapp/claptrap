@@ -69,21 +69,21 @@ def normalized_columns_initializer(std=1.0):
 	return _initializer
 
 # Sample from a given distribution
-# def sample_dist(dist):
-# 	epsilon = 0.001
-# 	if random.random() < epsilon:
-# 		sample = np.random.choice(dist[0])
-# 		while sample == 0.:
-# 			sample = np.random.choice(dist[0])
-# 	else:
-# 		sample = max(dist[0])
-# 	sample = np.argmax(dist == sample)
-# 	return sample
-
-def sample_dist(dist):
-	sample = np.random.choice(dist[0], p=dist[0])
-	sample = np.argmax(dist==sample)
+def sample_dist(dist, steps):
+	epsilon = 1 - steps * 0.95 / 4000000
+	if random.random() < epsilon:
+		sample = np.random.choice(dist[0])
+		while sample == 0.:
+			sample = np.random.choice(dist[0])
+	else:
+		sample = max(dist[0])
+	sample = np.argmax(dist == sample)
 	return sample
+
+# def sample_dist(dist):
+# 	sample = np.random.choice(dist[0], p=dist[0])
+# 	sample = np.argmax(dist==sample)
+# 	return sample
 
 ## ACTOR-CRITIC NETWORK
 
@@ -258,7 +258,7 @@ class Worker():
 						current_sum = np.sum(action_dist[0])
 						action_dist[0] /= current_sum
 
-					action = sample_dist(action_dist)
+					action = sample_dist(action_dist, self.global_steps)
 					
 					obs = self.env.step(action)
 					
@@ -349,7 +349,7 @@ def main():
 	with tf.device("/cpu:0"): 
 		global_episodes = tf.Variable(0,dtype=tf.int32,name='global_episodes',trainable=False)
 		global_steps = tf.Variable(0,dtype=tf.int32,name='global_steps',trainable=False)
-		trainer = tf.train.AdamOptimizer(learning_rate=1*10**-3)
+		trainer = tf.train.RMSPropOptimizer(learning_rate=1e-3, decay=0.99, momentum=0.95)
 		master_network = AC_Network('global',None) # Generate global network
 		num_workers = psutil.cpu_count() # Set workers to number of available CPU threads
 		global _max_score, _running_avg_score, _steps, _episodes

@@ -11,3 +11,7 @@ lstm-xor/results/
 # snake
 # ignore WorkInProgress
 snake/gui/
+snake/gui/node_modules
+# ignore model and Tensorboard files
+snake/train_*/
+snake/model/
