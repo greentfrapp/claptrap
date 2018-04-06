@@ -1,10 +1,9 @@
 from __future__ import print_function
 
-import tensorflow as tf
 import numpy as np
 from numpy.random import RandomState
+from collections import Counter
 
-tf.set_random_seed(1)
 np.random.seed(1)
 
 def shuffle(data, random_seed=1):
@@ -23,35 +22,39 @@ class BinaryData(object):
 		self.length_type = length_type
 		self.data = []
 		self.labels = []
-		# Either '1' or '0' or padding character '*'
-		# eg. '101**' if max_seq_len == 5
-		self.dictionary = ["1", "0", "*"]
-		for i in np.arange(self.size):
-			if length_type == "fixed":
-				length = self.max_seq_len
-			elif length_type == "variable":
-				length = np.random.choice(np.arange(1, self.max_seq_len + 1))
-			sequence = ""
-			seq_sum = 0
-			for j in np.arange(length):
-				bit = np.random.choice([0, 1])
-				sequence += str(bit)
-				seq_sum += bit
-			self.data.append(self.pad(sequence))
-			# XOR-operation returns True (1) if sum(sequence) == len(sequence) or sum(sequence) == 0
-			if seq_sum == len(sequence) or seq_sum == 0:
-				self.labels.append([1])
-			# Else returns False (0)
-			else:
-				self.labels.append([0])
+		# Either 0 or 1 or padding character -1
+		# eg. [1,0,1,-1,-1] if max_seq_len == 5
+		self.dictionary = [0, 1, -1]
+		if length_type == "fixed":
+			self.data = (np.random.rand(self.size, self.max_seq_len) > 0.5).astype(np.int32)
+			# XOR-operation returns False (0) if sum(sequence) == len(sequence) or sum(sequence) == 0
+			# Else returns False (1)
+			self.labels = (((np.sum(self.data, axis=1) == 0).astype(np.int32) + (np.sum(self.data, axis=1) == self.max_seq_len).astype(np.int32)) == 0).astype(np.int32)
+		if length_type == "variable":
+			self.data = None
+			self.labels = None
+			counts = Counter(np.random.choice(np.arange(1, self.max_seq_len+1), self.size))
+			for length, count in counts.items():
+				subdata = (np.random.rand(count, length) > 0.5).astype(np.int32)
+				sublabels = (((np.sum(subdata, axis=1) == 0).astype(np.int32) + (np.sum(subdata, axis=1) == length).astype(np.int32)) == 0).astype(np.int32)
+				subdata = np.concatenate((subdata, (-1 * np.ones((count, self.max_seq_len - length)))), axis=1)
+				if self.data is None:
+					self.data = subdata
+				else:
+					self.data = np.concatenate((self.data, subdata))
+				if self.labels is None:
+					self.labels = sublabels
+				else:
+					self.labels = np.concatenate((self.labels, sublabels))
 		self.data = shuffle(self.data)
 		self.labels = shuffle(self.labels)
 		self.idx = 0
 
-	def pad(self, sequence):
-		for i in np.arange(self.max_seq_len - len(sequence)):
-			sequence += "*"
-		return sequence
+	def pad(self, string):
+		seq = list(string)
+		for i in np.arange(self.max_seq_len - len(seq)):
+			seq.append(-1)
+		return seq
 
 	def next(self, batch_size):
 		start = self.idx
@@ -71,14 +74,5 @@ class BinaryData(object):
 		batch_data = self.seq2vec(batch_raw_data)
 		return np.array(batch_data), np.array(batch_labels)
 
-	def seq2vec(self, data, reverse=False):
-		output = []
-		for sample in data:
-			sample = self.pad(sample)
-			vector = []
-			for c in list(sample):
-				vector.append(np.eye(len(self.dictionary))[self.dictionary.index(c)])
-			if reverse:
-				vector = vector[::-1]
-			output.append(vector)
-		return output
+	def seq2vec(self, data):
+		return np.eye(len(self.dictionary))[np.array(data, dtype=np.int32), :]

@@ -40,3 +40,21 @@ optional arguments:
   -m MODELPATH, --modelpath MODELPATH
 ```
 
+## Some Notes
+
+The Requests for Research problem suggested comparing two datasets:
+
+1. `-type fixed` Sequences of fixed length 50 
+2. `-type variable` Sequences of variable length, uniformly sampled from 1 to 50
+
+Considering that the LSTM is meant to model the [XOR](https://en.wikipedia.org/wiki/XOR_gate) operation, it is simple to see that the `fixed` dataset will rarely contain any samples of label `0`. More precisely, of the approximately 1e15 unique samples for binary sequences of length 50, only 2 samples will have label `0`. 
+
+In general, probability of label `0` occuring in sequences of length n is <img src="http://www.sciweavers.org/tex2img.php?eq=%202%5E%7B1-n%7D&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0" align="center" border="0" alt=" 2^{1-n}" width="42" height="18" />.
+
+<img src="https://raw.githubusercontent.com/greentfrapp/claptrap/master/lstm-xor/images/label_dist.png" alt="Distribution of labels in the two datasets" width="480px" height="whatever">
+
+*Label distributions for a random sample of the `fixed` and `variable` datasets with maximum length 50 and size 100000*
+
+On the other hand, the `variable` dataset is far more likely to contain samples of label `0`. Considering a uniform sampling from 1 to 50 for length, the probability of label `0` occuring is <img src="http://www.sciweavers.org/tex2img.php?eq=%200.02%5Csum_%7Bi%3D1%7D%5E%7B50%7D%7B2%5E%7B1-i%7D%7D%20%5Capprox%200.04&bc=White&fc=Black&im=jpg&fs=12&ff=arev&edit=0" align="center" border="0" alt=" 0.02\sum_{i=1}^{50}{2^{1-i}} \approx 0.04" width="162" height="53" />.
+
+Since an LSTM trained on the `fixed` dataset will virtually never see a sample with label `0`, the trained LSTM will likely only output `1` for any input. This gives good performance for a similarly distributed test set but performs poorly on a `variable` test set or any test set that has a relatively high proportion of samples labeled `0`. 
