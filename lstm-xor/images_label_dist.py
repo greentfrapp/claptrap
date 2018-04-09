@@ -12,6 +12,7 @@ from BinaryData import BinaryData
 
 COLOR_EMERALD = "#1abc9c"
 COLOR_ORANGE = "#f39c12"
+COLOR_ALIZARIN = "#e74c3c"
 
 def main():
 
@@ -22,17 +23,17 @@ def main():
 	ax.xaxis.set_ticks_position('bottom')
 	label_types = np.array([0, 1])
 	width = 0.1
-	color = {"variable": COLOR_ORANGE, "fixed": COLOR_EMERALD}
+	color = {"variable": COLOR_ORANGE, "fixed": COLOR_EMERALD, "fair": COLOR_ALIZARIN}
 
 	size = 100000
 	max_seq_len = 50
 
-	for i, length_type in enumerate(["variable", "fixed"]):
+	for i, length_type in enumerate(["variable", "fixed", "fair"]):
 		dataset = BinaryData(length_type=length_type, size=size, max_seq_len=max_seq_len)
 		_, labels = dataset.next(dataset.size)
 		ax.bar(label_types + i * width, [float(np.sum(labels == 0))/size, float(np.sum(labels == 1))/size], width, color=color[length_type], edgecolor=color[length_type], label=length_type)
 
-	ax.set_xticks(label_types + width)
+	ax.set_xticks(label_types + 1.5 * width)
 	ax.set_xticklabels(label_types)
 	ax.set_xlim([-0.3,1.5])
 	ax.set_xlabel('Label')

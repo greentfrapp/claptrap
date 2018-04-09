@@ -114,11 +114,15 @@ class Snake(object):
 			self.snake = self.snake[1:]
 
 	def feed(self):
-		x = np.random.choice(np.arange(self.max_x + 1))
-		y = np.random.choice(np.arange(self.max_y + 1))
-		while x in self.snake[:, 0] and y in self.snake[:, 1]:
+		collide = True
+		while collide:
+			collide = False
 			x = np.random.choice(np.arange(self.max_x + 1))
 			y = np.random.choice(np.arange(self.max_y + 1))
+			for segment in self.snake:
+				if np.array_equal([x, y], segment):
+					collide = True
+					break
 		self.food = [x, y]
 
 	def update_grid(self):

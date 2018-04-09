@@ -2,7 +2,7 @@ import numpy as np
 
 from Snake import Snake
 
-env = Snake()
+env = Snake(10,10)
 obs = env.reset()
 print(obs.grid)
 while obs.state == 1 or obs.state == 2:
@@ -22,6 +22,4 @@ while obs.state == 1 or obs.state == 2:
 	obs = env.step(action)
 	print(obs.grid)
 	print(obs.score)
-	print(env.snake)
-	print(env.food)
-	print(env.snake[:, 0])
+	print(env.timestep)
