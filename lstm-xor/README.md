@@ -5,28 +5,10 @@ Warm-up exercise from OpenAI's [Requests for Research 2.0](https://blog.openai.c
 Run the following to train with default parameters.
 
 ```
-$ python lstm-xor.py --train
-```
-
-or
-
-```
 $ python lstm-xor-keras.py --train
 ```
 
-The latter uses the Keras library and has much cleaner code, but the dataset used for both is the same.
-
-
 And the following command to test using the latest model, which allows you to enter binary sequences for the model to predict.
-
-```
-$ python lstm-xor.py --test
-
-No path supplied, using latest model...
-
-```
-
-or
 
 ```
 $ python lstm-xor-keras.py --test
@@ -38,7 +20,7 @@ No path supplied, using latest model...
 Or use the `-h` argument to check how to enter parameters.
 
 ```
-$ python lstm-xor.py -h
+$ python lstm-xor-keras.py -h
 usage: lstm-xor.py [-h] [--train] [-hn HIDDENNUM] [-sl SEQLEN] [-ds DATASIZE]
                    [-bs BATCHSIZE] [-e EPOCH] [-type {fixed,variable}]
                    [--test] [-m MODELPATH]
@@ -85,3 +67,23 @@ Since an LSTM trained on the `fixed` dataset will virtually never see a sample w
 In contrast, an LSTM trained on the `variable` dataset is likely to perform better due to the higher proportion (4%) of samples being of label `0`. However, it is still likely to miss out many test sequences of label `0`. 
 
 Finally, an LSTM trained on the `fair` dataset will perform the best on a random test set, since it is trained on an even number of `0` and `1` samples and is likely to have seen and recognize all the variations of samples labeled `0`.
+
+## Performance of different models trained on `fixed`, `variable` and `fair` datasets
+
+Try this by running the following after training a model
+
+```
+$ python lstm-xor-keras.py --test -type fixed
+```
+*Change `fixed` to `variable` or `fair` to test on different types of datasets*
+
+In this case, I use accuracy as the metric. This has certain disadvantages compared to using a metric like F1, but works for cases where the dataset only has a single label, eg. the `fixed` test set. The following are the results from a single run with default parameters.
+
+| Accuracy       |`fixed` model|`variable` model| `fair` model|
+| -------------  |:-------------:| :-----------:|:-----------:|
+| `fixed` test   | 1.000         | 1.000        | 1.000       |
+| `variable` test| 0.342         | 0.980        | 1.000*      |
+| `fair` test    | 0.507         | 0.510        | 1.000*      |
+**Actually ~0.9999 but rounded to 1.000*
+
+As explained earlier, the model trained on the `fair` dataset shows the best overall performance, followed by the `variable` model and finally the `fixed` model shows the worst performance.
