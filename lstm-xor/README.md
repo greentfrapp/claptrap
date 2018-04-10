@@ -84,6 +84,7 @@ In this case, I use accuracy as the metric. This has certain disadvantages compa
 | `fixed` test   | 1.000         | 1.000        | 1.000       |
 | `variable` test| 0.342         | 0.980        | 1.000*      |
 | `fair` test    | 0.507         | 0.510        | 1.000*      |
+
 **Actually ~0.9999 but rounded to 1.000*
 
 As explained earlier, the model trained on the `fair` dataset shows the best overall performance, followed by the `variable` model and finally the `fixed` model shows the worst performance.
