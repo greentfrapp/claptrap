@@ -59,7 +59,7 @@ def test(modelpath, max_seq_len=50, data_size=100000, length_type="fixed"):
 	
 	model = load_model(modelpath)
 	
-	predictions = model.predict(samples)
+	predictions = model.predict(samples).reshape(-1)
 
 	print("Accuracy on '{}' dataset: {}".format(length_type, float(sum(labels == predictions)) / len(labels)))
 
