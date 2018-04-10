@@ -58,10 +58,12 @@ if __name__ == "__main__":
 			n_epochs=args.epoch,
 			data_size=args.datasize,
 			length_type=args.lengthtype)
-	if args.test:
+	elif args.test:
 		modelpath = args.modelpath
 		if not modelpath:
 			print("\nNo path supplied, using latest model...")
 			modelpath = os.path.join("results", os.listdir("./results")[-1])
 		print("\nUsing model from: {}\n".format(modelpath))
 		test(modelpath)
+	else:
+		parser.print_help()
