@@ -108,7 +108,9 @@ if __name__ == "__main__":
 		modelpath = args.modelpath
 		if not modelpath:
 			print("\nNo path supplied, using latest model...")
-			modelpath = os.path.join("results", os.listdir("./results")[-1], "lstm_xor.h5")
+			models = os.listdir("./results")
+			models.sort()
+			modelpath = os.path.join("results", models[-1], "lstm_xor.h5")
 		print("\nUsing model from: {}\n".format(modelpath))
 		if args.live:
 			test_live(modelpath, max_seq_len=args.seqlen)
