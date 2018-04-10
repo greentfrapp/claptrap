@@ -55,6 +55,16 @@ def train(hidden_num=128, batch_size=10000, max_seq_len=50, n_epochs=100, data_s
 
 def test(modelpath, max_seq_len=50, data_size=100000, length_type="fixed"):
 	dataset = BinaryData(max_seq_len=max_seq_len, size=data_size, length_type=length_type)
+	samples, labels = dataset.next(dataset.size)
+	
+	model = load_model(modelpath)
+	
+	predictions = model.predict(samples)
+
+	print("Accuracy on '{}' dataset: {}".format(length_type, float(sum(labels == predictions)) / len(labels)))
+
+def test_live(modelpath, max_seq_len=50):
+	dataset = BinaryData(max_seq_len=max_seq_len, size=1)
 	
 	model = load_model(modelpath)
 	print("\nEnter 'q' to quit...")
@@ -83,7 +93,9 @@ if __name__ == "__main__":
 	parser.add_argument("-type", "--lengthtype", action='store', choices=["fixed", "variable", "fair"], default="fixed")
 	# Arguments for testing
 	parser.add_argument("--test", action='store_true')
+	parser.add_argument("--live", action='store_true')
 	parser.add_argument("-m", "--modelpath", action='store')
+	# parser.add_argument("-type", "--lengthtype", action='store', choices=["fixed", "variable", "fair"], default="fixed")
 	args = parser.parse_args()
 	if args.train:
 		train(hidden_num=args.hiddennum, 
@@ -98,4 +110,7 @@ if __name__ == "__main__":
 			print("\nNo path supplied, using latest model...")
 			modelpath = os.path.join("results", os.listdir("./results")[-1], "lstm_xor.h5")
 		print("\nUsing model from: {}\n".format(modelpath))
-		test(modelpath)
+		if args.live:
+			test_live(modelpath, max_seq_len=args.seqlen)
+		else:
+			test(modelpath, max_seq_len=args.seqlen, data_size=args.datasize, length_type=args.lengthtype)
