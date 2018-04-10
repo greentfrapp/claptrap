@@ -104,7 +104,7 @@ if __name__ == "__main__":
 			n_epochs=args.epoch,
 			data_size=args.datasize,
 			length_type=args.lengthtype)
-	if args.test:
+	elif args.test:
 		modelpath = args.modelpath
 		if not modelpath:
 			print("\nNo path supplied, using latest model...")
@@ -114,3 +114,5 @@ if __name__ == "__main__":
 			test_live(modelpath, max_seq_len=args.seqlen)
 		else:
 			test(modelpath, max_seq_len=args.seqlen, data_size=args.datasize, length_type=args.lengthtype)
+	else:
+		parser.print_help()
